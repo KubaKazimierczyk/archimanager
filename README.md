@@ -97,3 +97,4 @@ supabase/
 - [ ] Powiadomienia o zbliżających się terminach
 - [ ] Rozszerzenie modelu ML o seasonality i municipality-specific weights
 - [ ] Kolejne etapy projektu po pozwoleniu na budowę
+# archimanager

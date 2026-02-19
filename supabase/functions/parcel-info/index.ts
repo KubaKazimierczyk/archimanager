@@ -398,35 +398,109 @@ async function fetchEmapaElement(domain: string, id: string): Promise<Record<str
 
 // ── PDF download & Supabase Storage upload ──
 
-async function resolvePdfUrl(startUrl: string): Promise<string | null> {
-  // Fetch the URL; if it returns HTML, try to extract a direct PDF link from it
+// Known URL patterns that serve PDF content directly (no HEAD needed)
+const PDF_ENDPOINT_RE = /show_pdf|show_pdfdoc|getpdf|pobierz_pdf|plik\.php|getFile|getAttachment|BipAttachment|attachment\.php|download\.php|pobierz\.php|GetPlik|getPlik|DownloadFile|wyswietl_plik|pokaz_plik/i
+
+async function resolvePdfUrl(startUrl: string, depth = 0): Promise<string | null> {
+  if (depth > 3) { console.log('[store-pdf] Max depth exceeded'); return null }
+
   const res = await fetch(startUrl, {
-    headers: { 'User-Agent': 'ArchiManager/1.0', 'Accept': 'application/pdf,*/*' },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; ArchiManager/1.0)',
+      'Accept': 'application/pdf,text/html,*/*',
+    },
     signal: AbortSignal.timeout(20000),
   })
   if (!res.ok) { console.log(`[store-pdf] HTTP ${res.status} for ${startUrl}`); return null }
 
-  const ct = res.headers.get('content-type') || ''
-  if (ct.includes('pdf')) {
-    console.log(`[store-pdf] Direct PDF at ${startUrl}`)
+  const ct = (res.headers.get('content-type') || '').toLowerCase()
+  const cd = (res.headers.get('content-disposition') || '').toLowerCase()
+
+  // Direct PDF — by Content-Type or Content-Disposition filename
+  if (ct.includes('pdf')) { console.log(`[store-pdf] Direct PDF (ct) at ${startUrl}`); return startUrl }
+  if (cd.includes('.pdf')) { console.log(`[store-pdf] Direct PDF (cd) at ${startUrl}`); return startUrl }
+
+  // Binary attachment at depth>0 — we followed a known download link
+  if (depth > 0 && (ct.includes('octet-stream') || cd.includes('attachment'))) {
+    console.log(`[store-pdf] Binary attachment at depth=${depth}: ${startUrl}`)
     return startUrl
   }
 
-  // Response is HTML — look for a PDF link inside
+  // Not HTML — nothing to parse
+  if (!ct.includes('html') && ct !== '') { console.log(`[store-pdf] Not HTML (${ct}), skipping`); return null }
+
   const html = await res.text()
-  const pdfMatch = html.match(/href=["']([^"']+\.pdf(?:\?[^"']*)?)["']/i)
-  if (pdfMatch) {
-    let pdfUrl = pdfMatch[1].replace(/&amp;/g, '&')
-    if (pdfUrl.startsWith('//')) pdfUrl = `https:${pdfUrl}`
-    else if (!pdfUrl.startsWith('http')) {
-      const base = new URL(startUrl)
-      pdfUrl = `${base.origin}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`
-    }
-    console.log(`[store-pdf] Found PDF link in HTML: ${pdfUrl}`)
-    return pdfUrl
+
+  function resolveHref(href: string): string | null {
+    const h = href.replace(/&amp;/g, '&').trim()
+    if (!h || h.startsWith('#') || h.startsWith('javascript')) return null
+    try { return new URL(h, startUrl).href } catch { return null }
   }
 
-  console.log(`[store-pdf] Response is HTML but no PDF link found`)
+  // Collect all links with relevance scores
+  const candidates: Array<{ url: string; score: number }> = []
+  const seen = new Set<string>()
+
+  for (const m of html.matchAll(/<a\s[^>]*href=["']([^"']{4,})["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+    const url = resolveHref(m[1])
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+
+    const linkText = m[2].replace(/<[^>]+>/g, '').toLowerCase()
+    let score = 0
+
+    if (/\.pdf(\?|#|$)/i.test(url)) score += 20
+    if (PDF_ENDPOINT_RE.test(url)) score += 15
+    if (/tekst.uchwa|treść.uchwa|tekst.planu|tekst.miejscowego|uchwał.*mpzp|mpzp.*uchwał/i.test(linkText)) score += 12
+    if (/pobierz|download|otwórz|pokaż/i.test(linkText)) score += 6
+    if (/\bpdf\b/i.test(linkText)) score += 8
+    if (/\/doc\/|\/docs\/|\/files\/|\/plik\/|\/pobierz\/|\/download\//i.test(url)) score += 5
+
+    if (score > 0) candidates.push({ url, score })
+  }
+
+  candidates.sort((a, b) => b.score - a.score)
+  console.log(`[store-pdf] ${candidates.length} candidates at depth=${depth}, top scores: ${candidates.slice(0, 3).map(c => c.score).join(',')}`)
+
+  // Direct .pdf URLs — return without HEAD (highest confidence)
+  for (const { url, score } of candidates) {
+    if (score >= 20) { console.log(`[store-pdf] Direct .pdf URL: ${url}`); return url }
+  }
+
+  // Known PDF endpoints — return without HEAD (known to serve PDF)
+  for (const { url, score } of candidates) {
+    if (score >= 15 && PDF_ENDPOINT_RE.test(url)) {
+      console.log(`[store-pdf] Known PDF endpoint: ${url}`)
+      return url
+    }
+  }
+
+  // Remaining candidates — verify via HEAD request
+  for (const { url, score } of candidates.slice(0, 6)) {
+    if (score < 5) break
+    try {
+      const head = await fetch(url, {
+        method: 'HEAD',
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArchiManager/1.0)' },
+        signal: AbortSignal.timeout(8000),
+      })
+      const hCt = (head.headers.get('content-type') || '').toLowerCase()
+      const hCd = (head.headers.get('content-disposition') || '').toLowerCase()
+      if (hCt.includes('pdf') || hCd.includes('.pdf')) {
+        console.log(`[store-pdf] HEAD confirmed PDF (score=${score}): ${url}`)
+        return url
+      }
+      // If HEAD returned HTML and we have depth budget, recurse
+      if (hCt.includes('html') && score >= 10 && depth < 2) {
+        const nested = await resolvePdfUrl(url, depth + 1)
+        if (nested) return nested
+      }
+    } catch (e: unknown) {
+      console.log(`[store-pdf] HEAD error for ${url}: ${(e as Error).message}`)
+    }
+  }
+
+  console.log(`[store-pdf] No PDF found in HTML at ${startUrl}`)
   return null
 }
 
@@ -437,13 +511,24 @@ async function downloadAndStorePdf(actUrl: string, projectId: string, filename: 
     if (!pdfUrl) return null
 
     const res = await fetch(pdfUrl, {
-      headers: { 'User-Agent': 'ArchiManager/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ArchiManager/1.0)' },
       signal: AbortSignal.timeout(30000),
     })
     if (!res.ok) { console.log(`[store-pdf] PDF fetch HTTP ${res.status}`); return null }
     const pdfBytes = await res.arrayBuffer()
-    console.log(`[store-pdf] Downloaded ${pdfBytes.byteLength} bytes`)
-    if (pdfBytes.byteLength < 1000) { console.log('[store-pdf] File too small, likely not a PDF'); return null }
+    console.log(`[store-pdf] Downloaded ${pdfBytes.byteLength} bytes from ${pdfUrl}`)
+    if (pdfBytes.byteLength < 1000) { console.log('[store-pdf] File too small'); return null }
+
+    // Verify PDF magic bytes %PDF
+    const magic = new Uint8Array(pdfBytes.slice(0, 5))
+    const isPdf = magic[0] === 0x25 && magic[1] === 0x50 && magic[2] === 0x44 && magic[3] === 0x46
+    if (!isPdf) {
+      console.log(`[store-pdf] Not a PDF (magic: ${Array.from(magic).map(b => b.toString(16)).join(' ')}) — trying resolvePdfUrl recursion`)
+      // The resolved URL itself was HTML — try one level deeper
+      const deeperUrl = await resolvePdfUrl(pdfUrl, 2)
+      if (!deeperUrl || deeperUrl === pdfUrl) { console.log('[store-pdf] No deeper PDF found'); return null }
+      return downloadAndStorePdf(deeperUrl, projectId, filename)
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

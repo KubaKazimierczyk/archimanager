@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, RefreshCw, ExternalLink, CheckCircle, Loader, ChevronRight, FileX, Info } from 'lucide-react'
+import { AlertTriangle, RefreshCw, ExternalLink, CheckCircle, Loader, ChevronRight, FileX, Info, Menu } from 'lucide-react'
 import { db } from '../lib/database'
 import { storeMpzpPdf } from '../lib/mpzp'
 import { LoadingSpinner } from '../components/ui'
@@ -11,7 +11,7 @@ const REASON_LABELS = {
   blad_pobierania_pdf: 'Błąd pobierania PDF',
 }
 
-export default function MpzpFailures({ onRetried }) {
+export default function MpzpFailures({ onRetried, onMenuOpen }) {
   const navigate = useNavigate()
   const [failures, setFailures] = useState([])
   const [loading, setLoading] = useState(true)
@@ -62,14 +62,19 @@ export default function MpzpFailures({ onRetried }) {
 
   return (
     <div className="pb-10">
-      <div className="mb-7">
-        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight flex items-center gap-3">
-          <AlertTriangle size={24} className="text-amber-500" />
-          Import MPZP — błędy
-        </h1>
-        <p className="text-slate-500 mt-1 text-sm">
-          Projekty, dla których MPZP zostało wykryte, ale plik PDF nie załączył się automatycznie.
-        </p>
+      <div className="mb-7 flex items-start gap-3">
+        <button onClick={onMenuOpen} className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0 mt-0.5">
+          <Menu size={20} />
+        </button>
+        <div>
+          <h1 className="text-2xl md:text-[28px] font-bold text-slate-900 tracking-tight flex items-center gap-3">
+            <AlertTriangle size={24} className="text-amber-500" />
+            Import MPZP — błędy
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">
+            Projekty, dla których MPZP zostało wykryte, ale plik PDF nie załączył się automatycznie.
+          </p>
+        </div>
       </div>
 
       {failures.length === 0 ? (

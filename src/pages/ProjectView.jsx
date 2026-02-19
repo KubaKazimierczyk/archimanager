@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, User, MapPin, FileText, Flag,
   Download, Eye, Edit3, Save, Calendar, Clock, CheckCircle, Check,
   Info, TrendingUp, AlertTriangle, Activity, Upload, FileDown, X,
-  Bot, Send, Sparkles, Loader2,
+  Bot, Send, Sparkles, Loader2, Menu,
 } from 'lucide-react'
 import { APPLICATION_TYPES, MILESTONES, ROAD_CLASSES, BUILDING_TYPES } from '../lib/constants'
 import { predictDays } from '../lib/predictions'
@@ -13,10 +13,13 @@ import { downloadWniosekZjazd } from '../lib/pdf-generator'
 import { StatusBadge, DeadlineBar, InfoRow, LoadingSpinner, Input, Select } from '../components/ui'
 import toast from 'react-hot-toast'
 
-export default function ProjectView({ projects = [], historicalData = [], onUpdated }) {
-  const { id } = useParams()
+const URL_TO_TAB = { client: 'client', plot: 'plot', applications: 'applications', timeline: 'milestones' }
+const TAB_TO_URL = { client: 'client', plot: 'plot', applications: 'applications', milestones: 'timeline' }
+
+export default function ProjectView({ projects = [], historicalData = [], onUpdated, onMenuOpen }) {
+  const { id, tab: tabParam } = useParams()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('milestones')
+  const activeTab = URL_TO_TAB[tabParam] || 'milestones'
   const [expandedApp, setExpandedApp] = useState(null)
   const [editingApp, setEditingApp] = useState(null)
   const [editDates, setEditDates] = useState({})
@@ -207,11 +210,14 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
     <div className="pb-10">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/')} className="text-slate-500 hover:text-slate-700">
+        <button onClick={onMenuOpen} className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0">
+          <Menu size={20} />
+        </button>
+        <button onClick={() => navigate('/')} className="text-slate-500 hover:text-slate-700 flex-shrink-0">
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-slate-900 truncate">{project.name}</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate">{project.name}</h1>
           <p className="text-slate-400 mt-0.5 text-[13px]">{c.city} · Utworzono {project.created_at}</p>
         </div>
       </div>
@@ -221,14 +227,15 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
         {tabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all ${
+            onClick={() => navigate(`/project/${id}/${TAB_TO_URL[tab.id]}`)}
+            className={`flex-1 py-2.5 px-1 sm:px-4 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all ${
               activeTab === tab.id
                 ? 'bg-white text-slate-900 shadow-sm font-semibold'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <tab.icon size={15} />{tab.label}
+            <tab.icon size={15} />
+            <span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -239,7 +246,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
           <h2 className="text-lg font-semibold text-slate-900 mb-6 flex items-center gap-2.5">
             <User size={20} className="text-brand-500" /> Dane klienta (inwestora)
           </h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { l: 'Imię i nazwisko', v: `${c.first_name} ${c.last_name}` },
               { l: 'PESEL', v: c.pesel },
@@ -285,7 +292,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
 
           {!editingPlot ? (
             <>
-              <div className="grid grid-cols-4 gap-4 mb-5">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
                 {[
                   { l: 'Nr działki', v: pl.number },
                   { l: 'Powierzchnia', v: pl.area ? `${pl.area} m²` : '—' },
@@ -299,7 +306,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 ))}
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-5">
                 <InfoRow label="Typ budynku" value={pl.building_type} icon="🏠" />
                 <InfoRow label="Droga" value={pl.road_name ? `${pl.road_class} — ${pl.road_name}` : pl.road_class || '—'} icon="🛣️" />
                 <InfoRow label="Nr dz. drogowej" value={pl.road_plot_number} icon="📍" />
@@ -419,7 +426,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                     </div>
                   )}
                   {/* Przeznaczenie */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InfoRow label="Przeznaczenie terenu" value={pl.purpose} icon="📋" />
                     <InfoRow label="Przeznaczenie dopuszczalne" value={pl.purpose_allowed} icon="📝" />
                   </div>
@@ -431,7 +438,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                     </div>
                   )}
                   {/* Parametry zabudowy */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InfoRow label="Wysokość zabudowy" value={pl.building_height} icon="📏" />
                     <InfoRow label="Wysokość budynku / kalenicy" value={pl.ridge_height} icon="🏔️" />
                     <InfoRow label="Długość elewacji frontowej" value={pl.facade_length} icon="↔️" />
@@ -538,13 +545,13 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                   <MapPin size={15} className="text-brand-500" /> Dane podstawowe
                 </h3>
-                <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                   <Input label="Nr działki *" value={plotDraft.number || ''} onChange={e => upPlot('number', e.target.value)} placeholder="123/4" />
                   <Input label="Obręb *" value={plotDraft.precinct || ''} onChange={e => upPlot('precinct', e.target.value)} placeholder="Piaseczno" />
                   <Input label="Powierzchnia (m²)" value={plotDraft.area || ''} onChange={e => upPlot('area', e.target.value)} placeholder="1200" />
                   <Input label="Nr KW" value={plotDraft.land_register || ''} onChange={e => upPlot('land_register', e.target.value)} placeholder="WA1I/..." />
                 </div>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <Input label="Województwo" value={plotDraft.voivodeship || ''} onChange={e => upPlot('voivodeship', e.target.value)} />
                   <Input label="Powiat" value={plotDraft.county_name || ''} onChange={e => upPlot('county_name', e.target.value)} />
                   <Input label="Gmina" value={plotDraft.commune_name || ''} onChange={e => upPlot('commune_name', e.target.value)} />
@@ -557,7 +564,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                   🏠 Budynek i media
                 </h3>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Select label="Typ budynku" value={plotDraft.building_type || ''} onChange={e => upPlot('building_type', e.target.value)} options={BUILDING_TYPES} />
                   <Input label="Liczba mieszkańców" type="number" value={plotDraft.residents || ''} onChange={e => upPlot('residents', e.target.value)} />
                   <Input label="Zapotrzebowanie wody (m³/d)" value={plotDraft.water_demand || ''} onChange={e => upPlot('water_demand', e.target.value)} placeholder="0.8" />
@@ -570,7 +577,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
                   🛣️ Droga dojazdowa (zjazd)
                 </h3>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Select label="Klasa drogi" value={plotDraft.road_class || 'Gminna'} onChange={e => upPlot('road_class', e.target.value)} options={ROAD_CLASSES} />
                   <Input label="Nazwa drogi" value={plotDraft.road_name || ''} onChange={e => upPlot('road_name', e.target.value)} placeholder="ul. Lipowa" />
                   <Input label="Nr działki drogowej" value={plotDraft.road_plot_number || ''} onChange={e => upPlot('road_plot_number', e.target.value)} placeholder="300/1" />
@@ -592,7 +599,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 {plotDraft.has_mpzp === true && (
                   <div className="space-y-4">
                     <Input label="Teren (symbol z rysunku planu)" value={plotDraft.teren || ''} onChange={e => upPlot('teren', e.target.value)} placeholder="np. 22.39MN/U" />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input label="Przeznaczenie terenu" value={plotDraft.purpose || ''} onChange={e => upPlot('purpose', e.target.value)} placeholder="MN — zabudowa mieszkaniowa jednorodzinna" />
                       <Input label="Przeznaczenie dopuszczalne" value={plotDraft.purpose_allowed || ''} onChange={e => upPlot('purpose_allowed', e.target.value)} placeholder="usługi wbudowane, garaże" />
                     </div>
@@ -606,7 +613,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                         placeholder="Opis głównych zasad zagospodarowania terenu…"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input label="Wysokość zabudowy" value={plotDraft.building_height || ''} onChange={e => upPlot('building_height', e.target.value)} placeholder="do 9 m" />
                       <Input label="Wysokość budynku / kalenicy" value={plotDraft.ridge_height || ''} onChange={e => upPlot('ridge_height', e.target.value)} placeholder="max 10 m n.p.t." />
                       <Input label="Długość elewacji frontowej" value={plotDraft.facade_length || ''} onChange={e => upPlot('facade_length', e.target.value)} placeholder="max 20 m" />
@@ -679,7 +686,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                   {/* Expanded */}
                   {isExpanded && (
                     <div className="border-t border-slate-100 px-5 py-5">
-                      <div className="grid grid-cols-2 gap-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Info */}
                         <div>
                           <h4 className="text-[13px] font-semibold text-slate-600 mb-3">Informacje o wniosku</h4>
@@ -767,7 +774,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                           )}
                         </div>
                         {isEditing ? (
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <label className="label-field">Data złożenia wniosku</label>
                               <input type="date" className="input-field" value={editDates.filed_date} onChange={e => setEditDates(d => ({ ...d, filed_date: e.target.value }))} />

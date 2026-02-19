@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ArrowRight, Search, MapPin, Upload, Info, Car, Droplets, Zap, Layers, FileDown, Loader, ExternalLink, CheckCircle, XCircle, HelpCircle, X, Sparkles } from 'lucide-react'
+import { ChevronLeft, ArrowRight, Search, MapPin, Upload, Info, Car, Droplets, Zap, Layers, FileDown, Loader, ExternalLink, CheckCircle, XCircle, HelpCircle, X, Sparkles, Menu } from 'lucide-react'
 import { Input, Select } from '../components/ui'
 import { PROVINCES, PROPERTY_TITLES, ROAD_CLASSES, BUILDING_TYPES } from '../lib/constants'
 import { db } from '../lib/database'
@@ -135,7 +135,7 @@ function AddressPicker({ value, onChange }) {
 
   return (
     <div className="mb-4">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* ── Miejscowość ── */}
         <div>
           <label className="label-field">Miejscowość *</label>
@@ -248,7 +248,7 @@ function AddressPicker({ value, onChange }) {
 // ────────────────────────────────────────
 // MAIN FORM
 // ────────────────────────────────────────
-export default function NewProject({ onCreated }) {
+export default function NewProject({ onCreated, onMenuOpen }) {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
@@ -461,9 +461,12 @@ export default function NewProject({ onCreated }) {
   return (
     <div className="pb-10">
       <div className="flex items-center gap-3 mb-7">
-        <button onClick={() => navigate('/')} className="text-slate-500 hover:text-slate-700"><ChevronLeft size={20} /></button>
+        <button onClick={onMenuOpen} className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0">
+          <Menu size={20} />
+        </button>
+        <button onClick={() => navigate('/')} className="text-slate-500 hover:text-slate-700 flex-shrink-0"><ChevronLeft size={20} /></button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Nowy projekt</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-900">Nowy projekt</h1>
           <p className="text-slate-400 mt-0.5 text-[13px]">Krok {step} z 2</p>
         </div>
       </div>
@@ -485,11 +488,11 @@ export default function NewProject({ onCreated }) {
           <>
             <h2 className="text-lg font-semibold text-slate-900 mb-5">Dane klienta (inwestora)</h2>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <Input label="Imię *" value={client.first_name} onChange={e => setClient(c => ({...c, first_name: e.target.value}))} placeholder="Jan" />
               <Input label="Nazwisko *" value={client.last_name} onChange={e => setClient(c => ({...c, last_name: e.target.value}))} placeholder="Kowalski" />
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <Input label="PESEL" value={client.pesel} onChange={e => setClient(c => ({...c, pesel: e.target.value}))} placeholder="85010112345" />
               <Input label="NIP (firma)" value={client.nip} onChange={e => setClient(c => ({...c, nip: e.target.value}))} placeholder="opcjonalnie" />
             </div>
@@ -497,7 +500,7 @@ export default function NewProject({ onCreated }) {
             {/* Adres zamieszkania: Miejscowość | Ulica | Nr budynku */}
             <AddressPicker value={client} onChange={setClient} />
 
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <Input label="Nr mieszkania (opcjonalnie)" value={client.apartment} onChange={e => setClient(c => ({...c, apartment: e.target.value}))} placeholder="np. 12A" />
               <Input label="Telefon" value={client.phone} onChange={e => setClient(c => ({...c, phone: e.target.value}))} placeholder="600-000-000" />
               <Input label="Email" value={client.email} onChange={e => setClient(c => ({...c, email: e.target.value}))} placeholder="email@domena.pl" />
@@ -556,19 +559,19 @@ export default function NewProject({ onCreated }) {
             </div>
 
             {/* Plot fields */}
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <Input label="Numer działki *" value={plot.number} onChange={e => up('number', e.target.value)} placeholder="123/4" />
               <Input label="Obręb *" value={plot.precinct} onChange={e => up('precinct', e.target.value)} placeholder="Piaseczno" />
               <Input label="Powierzchnia (m²)" value={plot.area} onChange={e => up('area', e.target.value)} placeholder="auto" />
               <Input label="ID działki (ULDK)" value={plot.teryt_id} onChange={e => up('teryt_id', e.target.value)} placeholder="auto z wyszukiwarki" />
             </div>
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <Input label="Województwo" value={plot.voivodeship} onChange={e => up('voivodeship', e.target.value)} />
               <Input label="Powiat" value={plot.county_name} onChange={e => up('county_name', e.target.value)} />
               <Input label="Gmina" value={plot.commune_name} onChange={e => up('commune_name', e.target.value)} />
               <Input label="Użytki gruntowe" value={plot.land_use} onChange={e => up('land_use', e.target.value)} placeholder="auto (KIUG)" />
             </div>
-            <div className="grid grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <Input label="Nr KW" value={plot.land_register} onChange={e => up('land_register', e.target.value)} placeholder="WA1I/..." />
               <Select label="Tytuł prawny" value={plot.property_title} onChange={e => up('property_title', e.target.value)} options={PROPERTY_TITLES} />
               <Select label="Typ budynku" value={plot.building_type} onChange={e => up('building_type', e.target.value)} options={BUILDING_TYPES} />
@@ -577,7 +580,7 @@ export default function NewProject({ onCreated }) {
 
             {/* Road */}
             <h3 className="text-sm font-semibold text-slate-900 mt-6 mb-3 flex items-center gap-2"><Car size={16} className="text-orange-500" /> Dane drogi (zjazd)</h3>
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <Select label="Klasa drogi" value={plot.road_class} onChange={e => up('road_class', e.target.value)} options={ROAD_CLASSES} />
               <Input label="Nazwa drogi" value={plot.road_name} onChange={e => up('road_name', e.target.value)} placeholder="ul. Lipowa" />
               <Input label="Nr działki drogowej" value={plot.road_plot_number} onChange={e => up('road_plot_number', e.target.value)} placeholder="300/1" />
@@ -585,7 +588,7 @@ export default function NewProject({ onCreated }) {
 
             {/* Media */}
             <h3 className="text-sm font-semibold text-slate-900 mt-6 mb-3 flex items-center gap-2"><Droplets size={16} className="text-blue-500" /><Zap size={16} className="text-amber-500" /> Media</h3>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <Input label="Qdśr wody (m³/d)" value={plot.water_demand} onChange={e => up('water_demand', e.target.value)} placeholder="0.8" />
               <Input label="Moc przył. (kW)" value={plot.power_demand} onChange={e => up('power_demand', e.target.value)} placeholder="14" />
             </div>
@@ -655,7 +658,7 @@ export default function NewProject({ onCreated }) {
             {/* MPZP details */}
             {plot.has_mpzp === true && (
               <>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   <Input label="Przeznaczenie" value={plot.purpose} onChange={e => up('purpose', e.target.value)} placeholder="MN — jednorodzinna" />
                   <Input label="Max zabudowy (%)" value={plot.building_coverage} onChange={e => up('building_coverage', e.target.value)} placeholder="30" />
                   <Input label="Min biol. czynna (%)" value={plot.bio_area} onChange={e => up('bio_area', e.target.value)} placeholder="60" />
@@ -665,7 +668,7 @@ export default function NewProject({ onCreated }) {
                   <Input label="Parking (miejsca)" value={plot.parking} onChange={e => up('parking', e.target.value)} placeholder="2" />
                   <Input label="Odległości od granic" value={plot.setbacks} onChange={e => up('setbacks', e.target.value)} placeholder="4m/3m" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Select label="Rejestr zabytków" value={plot.heritage ? 'Tak' : 'Nie'} onChange={e => up('heritage', e.target.value === 'Tak')} options={['Nie', 'Tak']} />
                   <Select label="Ochrona krajobrazu" value={plot.landscape ? 'Tak' : 'Nie'} onChange={e => up('landscape', e.target.value === 'Tak')} options={['Nie', 'Tak']} />
                 </div>

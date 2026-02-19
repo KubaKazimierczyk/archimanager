@@ -12,6 +12,7 @@ export default function App() {
   const [projects, setProjects] = useState([])
   const [historicalData, setHistoricalData] = useState([])
   const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -35,9 +36,22 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden font-sans">
-      <Sidebar projects={projects} />
-      <main className="flex-1 overflow-y-auto bg-slate-50">
-        <div className="max-w-5xl mx-auto px-8 py-7">
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <Sidebar
+        projects={projects}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
+
+      <main className="flex-1 overflow-y-auto bg-slate-50 min-w-0">
+        <div className="max-w-5xl mx-auto px-4 py-5 md:px-8 md:py-7">
           <Routes>
             <Route
               path="/"
@@ -46,20 +60,22 @@ export default function App() {
                   projects={projects}
                   historicalData={historicalData}
                   loading={loading}
+                  onMenuOpen={() => setSidebarOpen(true)}
                 />
               }
             />
             <Route
               path="/new"
-              element={<NewProject onCreated={refreshProjects} />}
+              element={<NewProject onCreated={refreshProjects} onMenuOpen={() => setSidebarOpen(true)} />}
             />
             <Route
-              path="/project/:id"
+              path="/project/:id/:tab?"
               element={
                 <ProjectView
                   projects={projects}
                   historicalData={historicalData}
                   onUpdated={refreshProjects}
+                  onMenuOpen={() => setSidebarOpen(true)}
                 />
               }
             />
@@ -69,12 +85,13 @@ export default function App() {
                 <Analytics
                   projects={projects}
                   historicalData={historicalData}
+                  onMenuOpen={() => setSidebarOpen(true)}
                 />
               }
             />
             <Route
               path="/mpzp-failures"
-              element={<MpzpFailures onRetried={refreshProjects} />}
+              element={<MpzpFailures onRetried={refreshProjects} onMenuOpen={() => setSidebarOpen(true)} />}
             />
           </Routes>
         </div>

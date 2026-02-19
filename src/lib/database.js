@@ -207,8 +207,12 @@ export const db = {
           ...p,
           applications: p.applications.map(a => {
             if (a.id !== appId) return a
-            const updated = { ...a, ...updates }
-            // Auto-compute
+            // Sanitize: empty strings → null (same as Supabase branch)
+            const sanitized = { ...updates }
+            if (sanitized.filed_date === '') sanitized.filed_date = null
+            if (sanitized.response_date === '') sanitized.response_date = null
+            const updated = { ...a, ...sanitized }
+            // Auto-compute status and actual_days
             if (updated.filed_date && updated.response_date) {
               updated.actual_days = Math.floor(
                 (new Date(updated.response_date) - new Date(updated.filed_date)) / 864e5
@@ -227,6 +231,10 @@ export const db = {
               }
             } else if (updated.filed_date) {
               updated.status = 'WAITING'
+              updated.actual_days = null
+            } else {
+              updated.status = 'TODO'
+              updated.actual_days = null
             }
             return updated
           }),

@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, FileText, Clock, CheckCircle, ChevronRight, TrendingUp, Activity, Plus } from 'lucide-react'
+import { FolderOpen, FileText, Clock, CheckCircle, ChevronRight, TrendingUp, Activity, Plus, Menu } from 'lucide-react'
 import { APPLICATION_TYPES } from '../lib/constants'
 import { predictDays } from '../lib/predictions'
 import { ProgressRing, LoadingSpinner, EmptyState } from '../components/ui'
 
-export default function Dashboard({ projects = [], historicalData = [], loading }) {
+export default function Dashboard({ projects = [], historicalData = [], loading, onMenuOpen }) {
   const navigate = useNavigate()
 
   if (loading) return <LoadingSpinner />
@@ -32,13 +32,18 @@ export default function Dashboard({ projects = [], historicalData = [], loading 
 
   return (
     <div className="pb-10">
-      <div className="mb-8">
-        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight">Panel główny</h1>
-        <p className="text-slate-500 mt-1 text-sm">Przegląd projektów, wniosków i terminów</p>
+      <div className="mb-8 flex items-center gap-3">
+        <button onClick={onMenuOpen} className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 flex-shrink-0">
+          <Menu size={20} />
+        </button>
+        <div>
+          <h1 className="text-2xl md:text-[28px] font-bold text-slate-900 tracking-tight">Panel główny</h1>
+          <p className="text-slate-500 mt-1 text-sm">Przegląd projektów, wniosków i terminów</p>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-7">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
         {stats.map((stat, i) => (
           <div key={i} className="card p-5 relative overflow-hidden">
             <div className={`absolute -top-2 -right-2 w-16 h-16 rounded-full ${stat.bg} opacity-70`} />
@@ -51,7 +56,7 @@ export default function Dashboard({ projects = [], historicalData = [], loading 
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Projects list */}
         <div className="card overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -132,7 +137,7 @@ export default function Dashboard({ projects = [], historicalData = [], loading 
         <p className="text-xs text-indigo-200 mb-5 leading-relaxed">
           Model bayesowski. Prior: termin ustawowy. Posterior: aktualizowany danymi z {historicalData.length} ukończonych wniosków.
         </p>
-        <div className="grid grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           {['ZJAZD', 'WOD_KAN', 'ENERGIA'].map(key => {
             const pred = predictDays(key, null, historicalData)
             const type = APPLICATION_TYPES[key]

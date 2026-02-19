@@ -40,6 +40,7 @@ CREATE TABLE milestones (
   milestone_id TEXT NOT NULL, -- m1, m2, m3, m4
   status TEXT DEFAULT 'TODO' CHECK (status IN ('TODO', 'IN_PROGRESS', 'DONE', 'BLOCKED')),
   completed_date DATE,
+  completed_tasks JSONB DEFAULT '[]', -- array of completed task indices [0, 1, 3, ...]
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (project_id, milestone_id)
@@ -53,7 +54,8 @@ CREATE TABLE application_history (
   type TEXT NOT NULL,
   actual_days INTEGER NOT NULL,
   municipality TEXT,
-  filed_month INTEGER, -- 1-12 for seasonality analysis
+  provider TEXT,        -- road manager class for ZJAZD (Gminna/Powiatowa/etc), null for others
+  filed_month INTEGER,  -- 1-12 for seasonality analysis
   had_supplements BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -153,12 +155,13 @@ CREATE OR REPLACE FUNCTION log_application_completion()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.status = 'DONE' AND NEW.actual_days IS NOT NULL AND (OLD.status IS DISTINCT FROM 'DONE') THEN
-    INSERT INTO application_history (user_id, type, actual_days, municipality, filed_month)
+    INSERT INTO application_history (user_id, type, actual_days, municipality, provider, filed_month)
     SELECT
       p.user_id,
       NEW.type,
       NEW.actual_days,
       (p.client->>'city')::TEXT,
+      CASE WHEN NEW.type = 'ZJAZD' THEN (p.plot->>'road_class')::TEXT ELSE NULL END,
       EXTRACT(MONTH FROM NEW.filed_date)::INTEGER
     FROM projects p
     WHERE p.id = NEW.project_id;

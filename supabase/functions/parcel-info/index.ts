@@ -191,7 +191,7 @@ function parseEsriHtml(text: string): Partial<MpzpResult> {
       const name = uchwala
         ? `Uchwała ${uchwala}${dataDate ? ' z dnia ' + dataDate : ''}`
         : (planName || null)
-      return { status: "covered", planName: name, symbol, przeznaczenie }
+      return { status: "covered", planName: name, symbol, przeznaczenie, actUrl: link }
     }
   }
   return { status: "unknown" }

@@ -31,8 +31,11 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
   const [chatMessages, setChatMessages] = useState([])
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
   const mpzpFileRef = useRef(null)
   const chatEndRef = useRef(null)
+  const nameInputRef = useRef(null)
 
   const project = useMemo(() => projects.find(p => p.id === id), [projects, id])
 
@@ -53,6 +56,22 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
     { id: 'applications', label: 'Wnioski', icon: FileText },
     { id: 'milestones', label: 'Timeline', icon: Flag },
   ]
+
+  const startEditName = () => {
+    setNameDraft(project.name)
+    setEditingName(true)
+    setTimeout(() => { nameInputRef.current?.select() }, 0)
+  }
+
+  const saveNameEdit = async () => {
+    const trimmed = nameDraft.trim()
+    if (!trimmed || trimmed === project.name) { setEditingName(false); return }
+    const { error } = await db.updateProject(id, { name: trimmed })
+    if (error) { toast.error('Błąd zapisu nazwy'); return }
+    setEditingName(false)
+    toast.success('Nazwa zaktualizowana')
+    if (onUpdated) await onUpdated()
+  }
 
   const startEditDates = (app) => {
     setEditingApp(app.id)
@@ -217,7 +236,31 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
           <ChevronLeft size={22} />
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate">{project.name}</h1>
+          {editingName ? (
+            <input
+              ref={nameInputRef}
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onBlur={saveNameEdit}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); saveNameEdit() }
+                if (e.key === 'Escape') setEditingName(false)
+              }}
+              className="text-xl md:text-2xl font-bold text-slate-900 w-full bg-transparent border-b-2 border-brand-500 outline-none leading-tight pb-0.5"
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate">{project.name}</h1>
+              <button
+                onClick={startEditName}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-all flex-shrink-0"
+                title="Edytuj nazwę projektu"
+              >
+                <Edit3 size={15} />
+              </button>
+            </div>
+          )}
           <p className="text-slate-400 mt-0.5 text-[13px]">{c.city} · Utworzono {project.created_at}</p>
         </div>
       </div>

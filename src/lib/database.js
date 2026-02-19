@@ -234,15 +234,23 @@ export const db = {
       })
       return { data: demoProjects.find(p => p.id === projectId), error: null }
     }
-    // Auto-compute actual_days when closing
+    // Sanitize: empty strings → null (PostgreSQL DATE columns reject '')
     const payload = { ...updates }
-    if (payload.filed_date && payload.response_date && !payload.actual_days) {
+    if (payload.filed_date === '') payload.filed_date = null
+    if (payload.response_date === '') payload.response_date = null
+
+    // Auto-compute status and actual_days
+    if (payload.filed_date && payload.response_date) {
       payload.actual_days = Math.floor(
         (new Date(payload.response_date) - new Date(payload.filed_date)) / 864e5
       )
       payload.status = 'DONE'
     } else if (payload.filed_date && !payload.response_date) {
       payload.status = 'WAITING'
+      payload.actual_days = null
+    } else if (!payload.filed_date) {
+      payload.status = 'TODO'
+      payload.actual_days = null
     }
 
     const { data, error } = await supabase

@@ -58,13 +58,20 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
 
   const saveDates = async (appId) => {
     const app = project.applications?.find(a => a.id === appId)
-    const historyContext = editDates.response_date ? {
-      municipality: c.city,
-      provider: app?.type === 'ZJAZD' ? pl.road_class : null,
-      filed_date: editDates.filed_date,
+    // Sanitize: empty strings → null (PostgreSQL DATE columns reject '')
+    const updates = {
+      filed_date: editDates.filed_date || null,
+      response_date: editDates.response_date || null,
+      notes: editDates.notes || '',
+    }
+    const historyContext = updates.response_date ? {
+      municipality: project.client?.city,
+      provider: app?.type === 'ZJAZD' ? project.plot?.road_class : null,
+      filed_date: updates.filed_date,
       type: app?.type,
     } : null
-    await db.updateApplication(project.id, appId, editDates, historyContext)
+    const { error } = await db.updateApplication(project.id, appId, updates, historyContext)
+    if (error) { toast.error('Błąd zapisu dat'); return }
     setEditingApp(null)
     toast.success('Daty zapisane')
     if (onUpdated) await onUpdated()

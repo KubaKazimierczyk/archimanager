@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, ChevronRight, ChevronDown, User, MapPin, FileText, Flag,
-  Download, Eye, Edit3, Save, Calendar, Clock, CheckCircle, Circle,
+  Download, Eye, Edit3, Save, Calendar, Clock, CheckCircle, Check,
   Info, TrendingUp, AlertTriangle, Activity, Upload, FileDown, X,
   Bot, Send, Sparkles, Loader2,
 } from 'lucide-react'
@@ -48,7 +48,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
     { id: 'client', label: 'Dane klienta', icon: User },
     { id: 'plot', label: 'Dane działki', icon: MapPin },
     { id: 'applications', label: 'Wnioski', icon: FileText },
-    { id: 'milestones', label: 'Kamienie milowe', icon: Flag },
+    { id: 'milestones', label: 'Timeline', icon: Flag },
   ]
 
   const startEditDates = (app) => {
@@ -172,6 +172,28 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
   const getMilestoneStatus = (ms) => {
     const pm = (project.milestones || []).find(m => m.id === ms.id)
     return pm?.status || 'TODO'
+  }
+
+  const getMilestoneCompletedTasks = (ms) => {
+    const pm = (project.milestones || []).find(m => m.id === ms.id)
+    return pm?.completed_tasks || []
+  }
+
+  const toggleTask = async (msId, taskIdx) => {
+    const ms = MILESTONES.find(m => m.id === msId)
+    const pm = (project.milestones || []).find(m => m.id === msId)
+    const current = pm?.completed_tasks || []
+    const next = current.includes(taskIdx)
+      ? current.filter(i => i !== taskIdx)
+      : [...current, taskIdx].sort((a, b) => a - b)
+    const total = ms?.tasks?.length || 0
+    const newStatus = next.length === 0 ? 'TODO' : next.length >= total ? 'DONE' : 'IN_PROGRESS'
+    await db.updateMilestone(project.id, msId, {
+      completed_tasks: next,
+      status: newStatus,
+      completed_date: newStatus === 'DONE' ? new Date().toISOString().split('T')[0] : null,
+    })
+    if (onUpdated) await onUpdated()
   }
 
   const c = project.client || {}
@@ -783,67 +805,78 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
         </div>
       )}
 
-      {/* ── MILESTONES TAB ─────────────────────────── */}
+      {/* ── TIMELINE TAB ────────────────────────────── */}
       {activeTab === 'milestones' && (
-        <div>
-          {MILESTONES.map((ms, idx) => {
-            const status = getMilestoneStatus(ms)
-            const isActive = status === 'IN_PROGRESS'
-            const isDone = status === 'DONE'
-            const MsIcon = ms.icon
+        <div className="relative">
+          <div className="absolute left-5 top-5 bottom-5 w-0.5 bg-slate-200 rounded-full" />
+          <div className="space-y-6">
+            {MILESTONES.map((ms, idx) => {
+              const status = getMilestoneStatus(ms)
+              const completedTasks = getMilestoneCompletedTasks(ms)
+              const isActive = status === 'IN_PROGRESS'
+              const isDone = status === 'DONE'
+              const MsIcon = ms.icon
 
-            return (
-              <div key={ms.id} className="relative">
-                {idx > 0 && (
-                  <div
-                    className="absolute left-[23px] -top-4 w-0.5 h-4"
-                    style={{ background: MILESTONES[idx-1] && getMilestoneStatus(MILESTONES[idx-1]) === 'DONE' ? '#10B981' : '#E2E8F0' }}
-                  />
-                )}
-                <div className="flex gap-4 mb-5">
-                  <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border-2 transition-all"
-                    style={{
-                      background: isDone ? '#ECFDF5' : isActive ? ms.color + '15' : '#F1F5F9',
-                      borderColor: isDone ? '#10B981' : isActive ? ms.color : '#E2E8F0',
-                    }}
-                  >
-                    {isDone ? <CheckCircle size={22} className="text-emerald-500" /> : <MsIcon size={22} style={{ color: isActive ? ms.color : '#94A3B8' }} />}
+              return (
+                <div key={ms.id} className="relative flex gap-4">
+                  {/* Node */}
+                  <div className="relative z-10 flex-shrink-0">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all shadow-sm"
+                      style={{
+                        background: isDone ? '#ECFDF5' : isActive ? ms.color + '18' : 'white',
+                        borderColor: isDone ? '#10B981' : isActive ? ms.color : '#E2E8F0',
+                      }}
+                    >
+                      {isDone
+                        ? <CheckCircle size={18} className="text-emerald-500" />
+                        : <MsIcon size={17} style={{ color: isActive ? ms.color : '#94A3B8' }} />
+                      }
+                    </div>
                   </div>
 
-                  <div className={`flex-1 card p-5 transition-all ${isActive ? 'ring-2' : ''}`} style={{ borderColor: isActive ? ms.color + '40' : undefined, ringColor: isActive ? ms.color + '10' : undefined }}>
-                    <div className="flex items-center justify-between mb-3">
+                  {/* Card */}
+                  <div
+                    className={`flex-1 card p-5 transition-all ${isActive ? 'ring-2 ring-offset-0' : ''}`}
+                    style={{ borderColor: isActive ? ms.color + '50' : undefined }}
+                  >
+                    <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="flex items-center gap-2.5">
-                          <h3 className={`text-base font-semibold ${isDone ? 'text-emerald-600' : 'text-slate-900'}`}>{ms.label}</h3>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Etap {idx + 1}</span>
                           <StatusBadge status={status} />
                         </div>
-                        <p className="text-[13px] text-slate-400 mt-0.5">{ms.description}</p>
+                        <h3 className={`text-[15px] font-semibold ${isDone ? 'text-emerald-600' : 'text-slate-900'}`}>{ms.label}</h3>
+                        <p className="text-[12px] text-slate-400 mt-0.5">{ms.description}</p>
                       </div>
-                      {isActive && (
-                        <span className="px-3 py-1 rounded-full text-white text-[11px] font-bold tracking-wider" style={{ background: ms.color }}>AKTYWNY</span>
-                      )}
+                      {isDone && <span className="text-[11px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-1 rounded-lg flex-shrink-0">✓ Ukończony</span>}
+                      {isActive && <span className="text-[11px] font-bold text-white px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: ms.color }}>W TOKU</span>}
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    {/* Interactive task checkboxes */}
+                    <div className="space-y-1.5">
                       {ms.tasks.map((task, ti) => {
-                        const taskDone = isDone || (isActive && ti < 2)
-                        const taskActive = isActive && ti === 2
+                        const checked = completedTasks.includes(ti)
                         return (
-                          <div
+                          <button
                             key={ti}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg ${taskDone ? 'bg-emerald-50/60' : taskActive ? 'bg-blue-50/60' : 'bg-slate-50/50'}`}
+                            onClick={() => toggleTask(ms.id, ti)}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group hover:bg-slate-100/70 ${checked ? 'bg-emerald-50/70' : 'bg-slate-50/50'}`}
                           >
-                            {taskDone ? <CheckCircle size={16} className="text-emerald-500" /> : taskActive ? <Circle size={16} className="text-blue-500" strokeWidth={3} /> : <Circle size={16} className="text-slate-300" />}
-                            <span className={`text-[13px] ${taskDone ? 'text-emerald-800 line-through' : taskActive ? 'text-blue-800 font-semibold' : 'text-slate-500'}`}>{task}</span>
-                          </div>
+                            <div className={`w-4 h-4 rounded border-[1.5px] flex items-center justify-center flex-shrink-0 transition-all ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white group-hover:border-slate-400'}`}>
+                              {checked && <Check size={10} className="text-white" strokeWidth={3} />}
+                            </div>
+                            <span className={`text-[13px] leading-snug ${checked ? 'text-emerald-700 line-through decoration-emerald-300' : 'text-slate-600'}`}>
+                              {task}
+                            </span>
+                          </button>
                         )
                       })}
                     </div>
 
                     {ms.id === 'm3' && (
                       <div className="mt-3.5 p-3 bg-gradient-to-r from-brand-50 to-indigo-100 rounded-xl">
-                        <div className="text-xs font-semibold text-brand-700 flex items-center gap-1.5 mb-1"><TrendingUp size={14} /> Szacowany czas ukończenia etapu</div>
+                        <div className="text-xs font-semibold text-brand-700 flex items-center gap-1.5 mb-1"><TrendingUp size={13} /> Szacowany czas ukończenia etapu</div>
                         <div className="text-[13px] text-brand-700">
                           Na podstawie ML: <strong>~{Math.max(...['ZJAZD','WOD_KAN','ENERGIA'].map(k => predictDays(k, null, historicalData).predicted || 0))} dni</strong> od złożenia ostatniego wniosku
                         </div>
@@ -851,15 +884,15 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                     )}
                     {ms.id === 'm4' && (
                       <div className="mt-3.5 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                        <div className="text-xs font-semibold text-amber-800 flex items-center gap-1.5 mb-1"><AlertTriangle size={14} /> Wymaga kompletnych odpowiedzi</div>
+                        <div className="text-xs font-semibold text-amber-800 flex items-center gap-1.5 mb-1"><AlertTriangle size={13} /> Wymaga kompletnych odpowiedzi</div>
                         <div className="text-xs text-amber-700">Wniosek o pozwolenie na budowę: 65 dni rozpatrzenie + 14 dni uprawomocnienie.</div>
                       </div>
                     )}
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
     </div>

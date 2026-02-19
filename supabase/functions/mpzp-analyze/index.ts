@@ -49,7 +49,7 @@ serve(async (req) => {
   }
 
   try {
-    const { pdfUrl, action, question } = await req.json()
+    const { pdfUrl, action, question, plotData } = await req.json()
 
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")
     if (!ANTHROPIC_API_KEY) {
@@ -80,9 +80,23 @@ serve(async (req) => {
     const pdfBase64 = arrayBufferToBase64(pdfBuffer)
     console.log(`[mpzp-analyze] PDF size: ${Math.round(pdfBuffer.byteLength / 1024)} KB, action: ${action}`)
 
+    let plotContext = ""
+    if (action === "chat" && plotData && typeof plotData === "object") {
+      const parts: string[] = []
+      if (plotData.number)        parts.push(`numer działki: ${plotData.number}`)
+      if (plotData.precinct)      parts.push(`obręb: ${plotData.precinct}`)
+      if (plotData.area)          parts.push(`powierzchnia: ${plotData.area} m²`)
+      if (plotData.road_name)     parts.push(`adres/droga: ${plotData.road_name}`)
+      if (plotData.building_type) parts.push(`planowany rodzaj zabudowy: ${plotData.building_type}`)
+      if (plotData.teren)         parts.push(`symbol terenu MPZP: ${plotData.teren}`)
+      if (parts.length > 0) {
+        plotContext = `Kontekst działki inwestora: ${parts.join(", ")}.\n\n`
+      }
+    }
+
     const userPrompt = action === "extract"
       ? EXTRACT_PROMPT
-      : (question?.trim() || "Opisz najważniejsze zasady zagospodarowania terenu z tego MPZP.")
+      : `${plotContext}${question?.trim() || "Opisz najważniejsze zasady zagospodarowania terenu z tego MPZP."}`
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

@@ -313,10 +313,10 @@ export const db = {
     return { data, error }
   },
 
-  async chatMpzpFile(pdfUrl, question) {
+  async chatMpzpFile(pdfUrl, question, plotData) {
     if (!isSupabaseConfigured()) return { data: null, error: 'Demo mode — Supabase not configured' }
     const { data, error } = await supabase.functions.invoke('mpzp-analyze', {
-      body: { pdfUrl, action: 'chat', question },
+      body: { pdfUrl, action: 'chat', question, plotData },
     })
     return { data, error }
   },

@@ -119,7 +119,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
     setChatMessages(msgsWithUser)
     setChatLoading(true)
     try {
-      const { data, error } = await db.chatMpzpFile(pl.mpzp_file_url, question)
+      const { data, error } = await db.chatMpzpFile(pl.mpzp_file_url, question, pl)
       const aiMsg = {
         role: 'ai',
         text: error || !data?.answer

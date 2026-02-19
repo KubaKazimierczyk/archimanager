@@ -169,19 +169,16 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
     }
   }
 
-  const getMilestoneStatus = (ms) => {
-    const pm = (project.milestones || []).find(m => m.id === ms.id)
-    return pm?.status || 'TODO'
-  }
+  // In Supabase mode milestones have `milestone_id` ('m1'…); in demo mode they use `id`
+  const findMs = (msId) => (project.milestones || []).find(m => (m.milestone_id || m.id) === msId)
 
-  const getMilestoneCompletedTasks = (ms) => {
-    const pm = (project.milestones || []).find(m => m.id === ms.id)
-    return pm?.completed_tasks || []
-  }
+  const getMilestoneStatus = (ms) => findMs(ms.id)?.status || 'TODO'
+
+  const getMilestoneCompletedTasks = (ms) => findMs(ms.id)?.completed_tasks || []
 
   const toggleTask = async (msId, taskIdx) => {
     const ms = MILESTONES.find(m => m.id === msId)
-    const pm = (project.milestones || []).find(m => m.id === msId)
+    const pm = findMs(msId)
     const current = pm?.completed_tasks || []
     const next = current.includes(taskIdx)
       ? current.filter(i => i !== taskIdx)

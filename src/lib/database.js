@@ -75,14 +75,18 @@ const DEMO_PROJECTS = [
 ]
 
 const DEMO_HISTORICAL = [
-  { type: 'ZJAZD', actual_days: 22, municipality: 'Piaseczno' },
-  { type: 'ZJAZD', actual_days: 28, municipality: 'Piaseczno' },
-  { type: 'ZJAZD', actual_days: 18, municipality: 'Grodzisk Mazowiecki' },
-  { type: 'WOD_KAN', actual_days: 15, municipality: 'Piaseczno' },
-  { type: 'WOD_KAN', actual_days: 19, municipality: 'Pruszków' },
-  { type: 'ENERGIA', actual_days: 14, municipality: 'Piaseczno' },
-  { type: 'ENERGIA', actual_days: 20, municipality: 'Grodzisk Mazowiecki' },
-  { type: 'ENERGIA', actual_days: 18, municipality: 'Pruszków' },
+  { type: 'ZJAZD', actual_days: 22, municipality: 'Piaseczno', provider: 'Gminna', filed_month: 3 },
+  { type: 'ZJAZD', actual_days: 28, municipality: 'Piaseczno', provider: 'Gminna', filed_month: 8 },
+  { type: 'ZJAZD', actual_days: 18, municipality: 'Grodzisk Mazowiecki', provider: 'Gminna', filed_month: 5 },
+  { type: 'ZJAZD', actual_days: 35, municipality: 'Warszawa', provider: 'Powiatowa', filed_month: 7 },
+  { type: 'ZJAZD', actual_days: 24, municipality: 'Pruszków', provider: 'Gminna', filed_month: 2 },
+  { type: 'WOD_KAN', actual_days: 15, municipality: 'Piaseczno', provider: null, filed_month: 4 },
+  { type: 'WOD_KAN', actual_days: 19, municipality: 'Pruszków', provider: null, filed_month: 9 },
+  { type: 'WOD_KAN', actual_days: 12, municipality: 'Piaseczno', provider: null, filed_month: 1 },
+  { type: 'ENERGIA', actual_days: 14, municipality: 'Piaseczno', provider: null, filed_month: 3 },
+  { type: 'ENERGIA', actual_days: 20, municipality: 'Grodzisk Mazowiecki', provider: null, filed_month: 8 },
+  { type: 'ENERGIA', actual_days: 18, municipality: 'Pruszków', provider: null, filed_month: 6 },
+  { type: 'ENERGIA', actual_days: 25, municipality: 'Warszawa', provider: null, filed_month: 7 },
 ]
 
 // ─── IN-MEMORY STATE (demo mode) ──────────────────────────
@@ -194,7 +198,8 @@ export const db = {
   },
 
   // ── Applications ──────────────────────────────────────
-  async updateApplication(projectId, appId, updates) {
+  // historyContext: { municipality, provider, filed_date } — passed when closing an application
+  async updateApplication(projectId, appId, updates, historyContext = null) {
     if (!isSupabaseConfigured()) {
       demoProjects = demoProjects.map(p => {
         if (p.id !== projectId) return p
@@ -209,13 +214,15 @@ export const db = {
                 (new Date(updated.response_date) - new Date(updated.filed_date)) / 864e5
               )
               updated.status = 'DONE'
-              // Add to historical data for ML
+              // Add to historical data for ML (with provider + filed_month)
               const type = APPLICATION_TYPES[updated.type]
               if (type) {
                 demoHistorical.push({
                   type: updated.type,
                   actual_days: updated.actual_days,
                   municipality: p.client?.city || '',
+                  provider: updated.type === 'ZJAZD' ? (p.plot?.road_class || null) : null,
+                  filed_month: updated.filed_date ? new Date(updated.filed_date).getMonth() + 1 : null,
                 })
               }
             } else if (updated.filed_date) {
@@ -227,12 +234,40 @@ export const db = {
       })
       return { data: demoProjects.find(p => p.id === projectId), error: null }
     }
+    // Auto-compute actual_days when closing
+    const payload = { ...updates }
+    if (payload.filed_date && payload.response_date && !payload.actual_days) {
+      payload.actual_days = Math.floor(
+        (new Date(payload.response_date) - new Date(payload.filed_date)) / 864e5
+      )
+      payload.status = 'DONE'
+    } else if (payload.filed_date && !payload.response_date) {
+      payload.status = 'WAITING'
+    }
+
     const { data, error } = await supabase
       .from('applications')
-      .update(updates)
+      .update(payload)
       .eq('id', appId)
       .select()
       .single()
+
+    // Save to application_history for ML when application is closed
+    if (!error && payload.actual_days && historyContext) {
+      const filedMonth = historyContext.filed_date
+        ? new Date(historyContext.filed_date).getMonth() + 1
+        : null
+      supabase.from('application_history').insert({
+        type: data?.type || historyContext.type,
+        actual_days: payload.actual_days,
+        municipality: historyContext.municipality || null,
+        provider: historyContext.provider || null,
+        filed_month: filedMonth,
+      }).then(({ error: hErr }) => {
+        if (hErr) console.warn('[db] application_history insert error:', hErr.message)
+      })
+    }
+
     return { data, error }
   },
 
@@ -268,6 +303,8 @@ export const db = {
           type: h.type,
           actualDays: h.actual_days,
           municipality: h.municipality,
+          provider: h.provider || null,
+          filed_month: h.filed_month || null,
         })),
         error: null,
       }
@@ -281,6 +318,8 @@ export const db = {
         type: h.type,
         actualDays: h.actual_days,
         municipality: h.municipality,
+        provider: h.provider || null,
+        filed_month: h.filed_month || null,
       })),
       error,
     }

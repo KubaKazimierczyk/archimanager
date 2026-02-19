@@ -57,7 +57,14 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
   }
 
   const saveDates = async (appId) => {
-    await db.updateApplication(project.id, appId, editDates)
+    const app = project.applications?.find(a => a.id === appId)
+    const historyContext = editDates.response_date ? {
+      municipality: c.city,
+      provider: app?.type === 'ZJAZD' ? pl.road_class : null,
+      filed_date: editDates.filed_date,
+      type: app?.type,
+    } : null
+    await db.updateApplication(project.id, appId, editDates, historyContext)
     setEditingApp(null)
     toast.success('Daty zapisane')
     if (onUpdated) await onUpdated()
@@ -602,7 +609,12 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
             const Icon = type.icon
             const isExpanded = expandedApp === app.id
             const isEditing = editingApp === app.id
-            const pred = predictDays(app.type, c.city, historicalData)
+            const provider = app.type === 'ZJAZD' ? pl.road_class : null
+            const pred = predictDays(app.type, c.city, historicalData, provider)
+            const daysWaiting = app.filed_date && !app.response_date
+              ? Math.floor((Date.now() - new Date(app.filed_date)) / 864e5)
+              : null
+            const isOverdue = daysWaiting !== null && pred.upper !== null && daysWaiting > pred.upper
 
             return (
               <div key={app.id} className="mb-3">
@@ -623,7 +635,12 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                       {app.filed_date && <DeadlineBar filedDate={app.filed_date} legalDays={type.legalDays} status={app.status} />}
                     </div>
                     <div className="flex items-center gap-2">
-                      {pred.predicted && (
+                      {isOverdue && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700">
+                          <AlertTriangle size={10} /> +{daysWaiting - pred.upper}d
+                        </span>
+                      )}
+                      {pred.predicted && !isOverdue && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-brand-50 to-indigo-100 text-brand-700">
                           <Activity size={10} /> ~{pred.predicted}d
                         </span>
@@ -647,11 +664,34 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                             {type.appeal && <div><strong>Odwołanie:</strong> {type.appeal}</div>}
                             {type.note && <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg text-xs text-amber-800">{type.note}</div>}
                           </div>
+                          {isOverdue && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                              <AlertTriangle size={15} className="text-red-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <div className="text-xs font-semibold text-red-700">Przekroczony oczekiwany termin</div>
+                                <div className="text-xs text-red-600 mt-0.5">
+                                  Wniosek czeka już <strong>{daysWaiting} dni</strong> — o {daysWaiting - pred.upper} dni dłużej niż 75% podobnych spraw. Rozważ kontakt z urzędem.
+                                </div>
+                              </div>
+                            </div>
+                          )}
                           {pred.predicted && (
                             <div className="mt-4 p-4 bg-gradient-to-r from-brand-50 to-indigo-100 rounded-xl">
                               <div className="text-xs font-semibold text-brand-700 mb-1.5 flex items-center gap-1.5"><TrendingUp size={14} /> Predykcja ML</div>
-                              <div className="text-xl font-bold text-indigo-900">{pred.predicted} dni <span className="text-xs font-normal text-brand-500">({pred.lower}–{pred.upper})</span></div>
-                              <div className="text-[11px] text-brand-500 mt-1">Pewność: {Math.round(pred.confidence * 100)}% · {pred.basis}</div>
+                              <div className="text-xl font-bold text-indigo-900">{pred.predicted} dni</div>
+                              {pred.dataPoints >= 5 ? (
+                                <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
+                                  {[['p25', '25%'], ['p50', '50%'], ['p75', '75%'], ['p90', '90%']].map(([k, label]) => (
+                                    <div key={k} className="bg-white/60 rounded-lg py-1">
+                                      <div className="text-[10px] text-brand-400 font-medium">{label}</div>
+                                      <div className="text-xs font-bold text-indigo-800">{pred[k]}d</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-brand-500 mt-1">Przedział: {pred.lower}–{pred.upper} dni</div>
+                              )}
+                              <div className="text-[11px] text-brand-500 mt-1.5">Pewność: {Math.round(pred.confidence * 100)}% · {pred.basis}</div>
                             </div>
                           )}
                         </div>

@@ -134,7 +134,8 @@ export const terytApi = {
   /**
    * Wyszukaj ulicę w danej miejscowości.
    * 1. Supabase Edge Function → GUS TERYT SOAP (gdy cityTerytId dostępny)
-   * 2. Nominatim street search w danej miejscowości (fallback)
+   * 2. Nominatim structured search: street + city jako osobne parametry
+   * 3. Nominatim free-form fallback z pełną nazwą
    */
   async searchStreet(cityTerytId, query, cityName = '') {
     if (!query || query.length < 2) return []
@@ -151,15 +152,9 @@ export const terytApi = {
       }
     }
 
-    // 2. Nominatim — szukaj ulicy w danej miejscowości
-    // Używamy krótkiego prefiksu (max 4 znaki) dla Nominatim żeby dopasować
-    // częściowe słowa (np. "puławs" → szukaj "puł" → filtruj client-side)
-    const nominatimQuery = query.slice(0, Math.max(3, Math.ceil(query.length / 2)))
-    const q = cityName ? `${nominatimQuery}, ${cityName}, Polska` : `${nominatimQuery}, Polska`
     const queryLower = query.toLowerCase()
-    try {
-      const raw = await nominatimGet({ q })
 
+    function extractStreets(raw) {
       const seen = new Set()
       return raw
         .filter(r => r.address?.road)
@@ -168,8 +163,7 @@ export const terytApi = {
           const prefix = /^(aleja|al\.|plac|pl\.|rynek|osiedle|os\.)/i.test(road)
             ? road.split(/\s+/)[0]
             : 'ul.'
-          const name = road
-          return { name, prefix }
+          return { name: road, prefix }
         })
         .filter(r => {
           if (!r.name.toLowerCase().includes(queryLower)) return false
@@ -178,6 +172,24 @@ export const terytApi = {
           return true
         })
         .slice(0, 10)
+    }
+
+    // 2. Nominatim structured: street + city jako osobne pola — najlepsza trafność
+    if (cityName) {
+      try {
+        const raw = await nominatimGet({ street: query, city: cityName })
+        const results = extractStreets(raw)
+        if (results.length > 0) return results
+      } catch (e) {
+        console.warn('[TERYT] structured street search error:', e.message)
+      }
+    }
+
+    // 3. Fallback: pełna fraza (nie skracamy — skrócenie do 3 znaków szkodzi)
+    const q = cityName ? `${query}, ${cityName}, Polska` : `${query}, Polska`
+    try {
+      const raw = await nominatimGet({ q })
+      return extractStreets(raw)
     } catch (e) {
       console.warn('[TERYT] street search error:', e.message)
       return []

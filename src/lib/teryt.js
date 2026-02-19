@@ -152,7 +152,11 @@ export const terytApi = {
     }
 
     // 2. Nominatim — szukaj ulicy w danej miejscowości
-    const q = cityName ? `${query}, ${cityName}, Polska` : `${query}, Polska`
+    // Używamy krótkiego prefiksu (max 4 znaki) dla Nominatim żeby dopasować
+    // częściowe słowa (np. "puławs" → szukaj "puł" → filtruj client-side)
+    const nominatimQuery = query.slice(0, Math.max(3, Math.ceil(query.length / 2)))
+    const q = cityName ? `${nominatimQuery}, ${cityName}, Polska` : `${nominatimQuery}, Polska`
+    const queryLower = query.toLowerCase()
     try {
       const raw = await nominatimGet({ q })
 
@@ -164,11 +168,11 @@ export const terytApi = {
           const prefix = /^(aleja|al\.|plac|pl\.|rynek|osiedle|os\.)/i.test(road)
             ? road.split(/\s+/)[0]
             : 'ul.'
-          // Usuń prefix z nazwy jeśli już jest na początku
           const name = road
           return { name, prefix }
         })
         .filter(r => {
+          if (!r.name.toLowerCase().includes(queryLower)) return false
           if (seen.has(r.name)) return false
           seen.add(r.name)
           return true

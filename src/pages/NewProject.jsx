@@ -24,6 +24,7 @@ function AddressPicker({ value, onChange }) {
   const [cityLoading, setCityLoading] = useState(false)
   const [cityFocused, setCityFocused] = useState(false)
   const cityDebounce = useRef(null)
+  const cityReqId = useRef(0)
 
   // Street search state
   const [streetQuery, setStreetQuery] = useState('')
@@ -31,6 +32,7 @@ function AddressPicker({ value, onChange }) {
   const [streetLoading, setStreetLoading] = useState(false)
   const [streetFocused, setStreetFocused] = useState(false)
   const streetDebounce = useRef(null)
+  const streetReqId = useRef(0)
 
   // House number search state
   const [numberQuery, setNumberQuery] = useState('')
@@ -38,6 +40,7 @@ function AddressPicker({ value, onChange }) {
   const [numberLoading, setNumberLoading] = useState(false)
   const [numberFocused, setNumberFocused] = useState(false)
   const numberDebounce = useRef(null)
+  const numberReqId = useRef(0)
 
   const handleCityInput = (e) => {
     const q = e.target.value
@@ -46,7 +49,9 @@ function AddressPicker({ value, onChange }) {
     cityDebounce.current = setTimeout(async () => {
       if (q.length < 2) { setCityResults([]); return }
       setCityLoading(true)
+      const reqId = ++cityReqId.current
       const r = await terytApi.searchCity(q)
+      if (reqId !== cityReqId.current) return
       setCityResults(r)
       setCityLoading(false)
     }, 300)
@@ -82,7 +87,9 @@ function AddressPicker({ value, onChange }) {
     streetDebounce.current = setTimeout(async () => {
       if (q.length < 2 || !value.city) { setStreetResults([]); return }
       setStreetLoading(true)
+      const reqId = ++streetReqId.current
       const r = await terytApi.searchStreet(value.teryt_id || '', q, value.city)
+      if (reqId !== streetReqId.current) return
       setStreetResults(r)
       setStreetLoading(false)
     }, 300)
@@ -112,7 +119,9 @@ function AddressPicker({ value, onChange }) {
     numberDebounce.current = setTimeout(async () => {
       if (q.length < 1 || !value.city || !value.street) { setNumberResults([]); return }
       setNumberLoading(true)
+      const reqId = ++numberReqId.current
       const r = await terytApi.searchHouseNumber(value.city, value.street, q)
+      if (reqId !== numberReqId.current) return
       setNumberResults(r)
       setNumberLoading(false)
     }, 400)

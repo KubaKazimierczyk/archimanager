@@ -537,7 +537,7 @@ export default function NewProject({ onCreated }) {
               <Input label="Numer działki *" value={plot.number} onChange={e => up('number', e.target.value)} placeholder="123/4" />
               <Input label="Obręb *" value={plot.precinct} onChange={e => up('precinct', e.target.value)} placeholder="Piaseczno" />
               <Input label="Powierzchnia (m²)" value={plot.area} onChange={e => up('area', e.target.value)} placeholder="auto" />
-              <Input label="TERYT ID" value={plot.teryt_id} onChange={e => up('teryt_id', e.target.value)} placeholder="auto" />
+              <Input label="ID działki (ULDK)" value={plot.teryt_id} onChange={e => up('teryt_id', e.target.value)} placeholder="auto z wyszukiwarki" />
             </div>
             <div className="grid grid-cols-4 gap-4 mb-4">
               <Input label="Województwo" value={plot.voivodeship} onChange={e => up('voivodeship', e.target.value)} />

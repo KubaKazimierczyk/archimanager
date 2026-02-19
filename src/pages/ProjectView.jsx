@@ -299,6 +299,7 @@ export default function ProjectView({ projects = [], historicalData = [], onUpda
                 <InfoRow label="Zapotrzebowanie wody" value={pl.water_demand ? `${pl.water_demand} m³/d` : '—'} icon="💧" />
                 <InfoRow label="Moc przyłączeniowa" value={pl.power_demand ? `${pl.power_demand} kW` : '—'} icon="⚡" />
                 <InfoRow label="Liczba mieszkańców" value={pl.residents} icon="👥" />
+                {pl.teryt_id && <InfoRow label="ID działki (ULDK)" value={pl.teryt_id} icon="🔑" />}
               </div>
 
               {/* MPZP Status */}

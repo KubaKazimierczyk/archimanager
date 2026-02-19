@@ -365,14 +365,27 @@ async function fetchEmapaElement(domain: string, id: string): Promise<Record<str
     const html = await res.text()
     const fields = await parseEmapaFeature(html)
 
-    const uchwalaMatch = html.match(/href=["']([^"']*service=pln[^"']*request=getUchwala[^"']*)["']/i)
+    // Match any link that contains getUchwala (regardless of param order)
+    const uchwalaMatch = html.match(/href=["']([^"']*getUchwala[^"']*)["']/i)
+      || html.match(/href=["']([^"']*request=getUchwala[^"']*)["']/i)
     if (uchwalaMatch) {
-      let uUrl = uchwalaMatch[1]
+      let uUrl = uchwalaMatch[1].replace(/&amp;/g, '&')
       if (uUrl.startsWith('//')) uUrl = `https:${uUrl}`
       else if (!uUrl.startsWith('http')) uUrl = `https://${domain}${uUrl}`
       fields['_uchwala_url'] = uUrl
       const pid = uUrl.match(/[?&]p=(\d+)/)?.[1]
       if (pid) fields['_plan_id'] = pid
+    }
+
+    // Also look for a direct PDF link (some communes link directly)
+    if (!fields['_uchwala_url']) {
+      const pdfMatch = html.match(/href=["']([^"']+\.pdf)["']/i)
+      if (pdfMatch) {
+        let pUrl = pdfMatch[1].replace(/&amp;/g, '&')
+        if (pUrl.startsWith('//')) pUrl = `https:${pUrl}`
+        else if (!pUrl.startsWith('http')) pUrl = `https://${domain}${pUrl}`
+        fields['_uchwala_url'] = pUrl
+      }
     }
 
     return fields
@@ -384,16 +397,52 @@ async function fetchEmapaElement(domain: string, id: string): Promise<Record<str
 
 // ── PDF download & Supabase Storage upload ──
 
+async function resolvePdfUrl(startUrl: string): Promise<string | null> {
+  // Fetch the URL; if it returns HTML, try to extract a direct PDF link from it
+  const res = await fetch(startUrl, {
+    headers: { 'User-Agent': 'ArchiManager/1.0', 'Accept': 'application/pdf,*/*' },
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!res.ok) { console.log(`[store-pdf] HTTP ${res.status} for ${startUrl}`); return null }
+
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('pdf')) {
+    console.log(`[store-pdf] Direct PDF at ${startUrl}`)
+    return startUrl
+  }
+
+  // Response is HTML — look for a PDF link inside
+  const html = await res.text()
+  const pdfMatch = html.match(/href=["']([^"']+\.pdf(?:\?[^"']*)?)["']/i)
+  if (pdfMatch) {
+    let pdfUrl = pdfMatch[1].replace(/&amp;/g, '&')
+    if (pdfUrl.startsWith('//')) pdfUrl = `https:${pdfUrl}`
+    else if (!pdfUrl.startsWith('http')) {
+      const base = new URL(startUrl)
+      pdfUrl = `${base.origin}${pdfUrl.startsWith('/') ? '' : '/'}${pdfUrl}`
+    }
+    console.log(`[store-pdf] Found PDF link in HTML: ${pdfUrl}`)
+    return pdfUrl
+  }
+
+  console.log(`[store-pdf] Response is HTML but no PDF link found`)
+  return null
+}
+
 async function downloadAndStorePdf(actUrl: string, projectId: string, filename: string): Promise<string | null> {
   try {
-    console.log(`[store-pdf] Downloading: ${actUrl}`)
-    const res = await fetch(actUrl, {
+    console.log(`[store-pdf] Resolving: ${actUrl}`)
+    const pdfUrl = await resolvePdfUrl(actUrl)
+    if (!pdfUrl) return null
+
+    const res = await fetch(pdfUrl, {
       headers: { 'User-Agent': 'ArchiManager/1.0' },
       signal: AbortSignal.timeout(30000),
     })
-    if (!res.ok) { console.log(`[store-pdf] HTTP ${res.status}`); return null }
+    if (!res.ok) { console.log(`[store-pdf] PDF fetch HTTP ${res.status}`); return null }
     const pdfBytes = await res.arrayBuffer()
     console.log(`[store-pdf] Downloaded ${pdfBytes.byteLength} bytes`)
+    if (pdfBytes.byteLength < 1000) { console.log('[store-pdf] File too small, likely not a PDF'); return null }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -409,8 +458,8 @@ async function downloadAndStorePdf(actUrl: string, projectId: string, filename: 
     const { data } = sb.storage.from('project-files').getPublicUrl(path)
     console.log(`[store-pdf] Stored: ${data.publicUrl}`)
     return data.publicUrl || null
-  } catch (e) {
-    console.error('[store-pdf] Error:', e.message)
+  } catch (e: unknown) {
+    console.error('[store-pdf] Error:', (e as Error).message)
     return null
   }
 }

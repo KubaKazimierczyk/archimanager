@@ -115,6 +115,7 @@ type MpzpResult = {
   przeznaczenie: string | null
   actUrl: string | null
   raw: string
+  kimpzp_format: string
 }
 
 // ── Helper: parse an HTML table into key→value map (first data row) ──
@@ -467,7 +468,7 @@ async function downloadAndStorePdf(actUrl: string, projectId: string, filename: 
 // ── Main KIMPZP query ──
 
 async function queryKIMPZP(lat: number, lng: number): Promise<MpzpResult> {
-  const empty: MpzpResult = { status: "unknown", planName: null, symbol: null, przeznaczenie: null, actUrl: null, raw: "" }
+  const empty: MpzpResult = { status: "unknown", planName: null, symbol: null, przeznaczenie: null, actUrl: null, raw: "", kimpzp_format: "unknown" }
 
   const layers = "wektor-pow,wektor-lin,wektor-str,wektor-pkt,plany"
   let text = await fetchWMS(buildGFI(KIMPZP_URL, layers, lat, lng, "text/html", "1.1.1", 101), "KIMPZP")
@@ -521,7 +522,7 @@ async function queryKIMPZP(lat: number, lng: number): Promise<MpzpResult> {
 
     if (validFeatures.length === 0) return { ...empty, raw }
 
-    const result: MpzpResult = { ...empty, status: "covered", raw }
+    const result: MpzpResult = { ...empty, status: "covered", raw, kimpzp_format: "e-mapa" }
     const strFeatures = validFeatures.filter(f => f.typ === "str")
     const powFeatures = validFeatures.filter(f => f.typ === "pow")
     const primary = strFeatures.length > 0 ? strFeatures : powFeatures
@@ -546,35 +547,35 @@ async function queryKIMPZP(lat: number, lng: number): Promise<MpzpResult> {
   if (/<GetFeatureInfo_Result>/i.test(text)) {
     console.log("[KIMPZP] → XML ROWSET format (Warszawa)")
     const parsed = parseRowset(text)
-    return { ...empty, ...parsed, raw }
+    return { ...empty, ...parsed, raw, kimpzp_format: "rowset" }
   }
 
   // ── 4. GeoServer HTML ──
   if (/Geoserver GetFeatureInfo output/i.test(text)) {
     console.log("[KIMPZP] → GeoServer format")
     const parsed = parseGeoserver(text)
-    return { ...empty, ...parsed, raw }
+    return { ...empty, ...parsed, raw, kimpzp_format: "geoserver" }
   }
 
   // ── 5. ESRI ArcGIS HTML (Kraków, Wrocław, Opole, Katowice, Poznań) ──
   if (/esri_wms|FeatureInfoCollection/i.test(text)) {
     console.log("[KIMPZP] → ESRI ArcGIS HTML format")
     const parsed = parseEsriHtml(text)
-    return { ...empty, ...parsed, raw }
+    return { ...empty, ...parsed, raw, kimpzp_format: "esri" }
   }
 
   // ── 6. MapServer GFI HTML (Sopot, Gorzów, Zamość, Rzeszów) ──
   if (/GetFeatureInfo results/i.test(text)) {
     console.log("[KIMPZP] → MapServer GFI format")
     const parsed = parseMapServerGfi(text)
-    return { ...empty, ...parsed, raw }
+    return { ...empty, ...parsed, raw, kimpzp_format: "mapserver" }
   }
 
   // ── 7. MapProxy simple HTML (Legnica) ──
   if (/<title>\s*Information\s*<\/title>/i.test(text)) {
     console.log("[KIMPZP] → MapProxy simple HTML format (Legnica)")
     const parsed = parseLegnicaHtml(text)
-    return { ...empty, ...parsed, raw }
+    return { ...empty, ...parsed, raw, kimpzp_format: "mapproxy" }
   }
 
   // ── 8. igeomap.pl fallback ──
@@ -587,6 +588,7 @@ async function queryKIMPZP(lat: number, lng: number): Promise<MpzpResult> {
       planName: igeo.resolution || igeo.planName,
       actUrl: igeo.pdfUrl,
       raw,
+      kimpzp_format: "igeomap",
     }
   }
 
@@ -640,6 +642,7 @@ serve(async (req) => {
         przeznaczenie: mpzp.przeznaczenie,
         actUrl: mpzp.actUrl,
         raw: mpzp.raw,
+        kimpzp_format: mpzp.kimpzp_format,
       },
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

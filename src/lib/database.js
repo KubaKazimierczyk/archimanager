@@ -343,6 +343,20 @@ export const db = {
     return { data: data?.publicUrl || null }
   },
 
+  // ── MPZP Import Failures ──────────────────────────────
+  async getMpzpFailures() {
+    if (!isSupabaseConfigured()) return { data: [], error: null }
+    const { data, error } = await supabase
+      .from('projects')
+      .select('id, name, client, plot, created_at')
+      .eq('plot->>mpzp_status', 'covered')
+      .order('created_at', { ascending: false })
+    if (error) return { data: [], error }
+    // Filter client-side: covered but no PDF stored yet
+    const failures = (data || []).filter(p => !p.plot?.mpzp_file_url)
+    return { data: failures, error: null }
+  },
+
   // ── MPZP AI Analysis ──────────────────────────────────
   async analyzeMpzpFile(pdfUrl) {
     if (!isSupabaseConfigured()) return { data: null, error: 'Demo mode — Supabase not configured' }

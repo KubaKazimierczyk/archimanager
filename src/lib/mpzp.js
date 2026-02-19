@@ -71,6 +71,7 @@ export async function fetchParcelInfo(centroid, communeName) {
       przeznaczenie: mpzpData.przeznaczenie || null,
       actUrl: mpzpData.actUrl || null,
       raw: mpzpData.raw || '',
+      kimpzp_format: mpzpData.kimpzp_format || null,
       portalUrl,
       note: mpzpData.status === 'covered'
         ? `Teren objęty MPZP${mpzpData.planName ? ': ' + mpzpData.planName : ''}.${mpzpData.przeznaczenie ? ' Przeznaczenie: ' + mpzpData.przeznaczenie : ''}`

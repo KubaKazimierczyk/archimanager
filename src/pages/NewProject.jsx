@@ -357,6 +357,7 @@ export default function NewProject({ onCreated }) {
       up('mpzp_przeznaczenie', mpzp.przeznaczenie || '')
       up('mpzp_note', mpzp.note || '')
       up('mpzp_act_url', mpzp.actUrl || '')
+      up('mpzp_kimpzp_format', mpzp.kimpzp_format || '')
       if (mpzp.status === 'covered') { up('has_mpzp', true); toast.success('Działka objęta MPZP!') }
       else if (mpzp.status === 'not_covered') { up('has_mpzp', false); toast('Brak MPZP — WZ', { icon: '⚠️' }) }
 
@@ -420,18 +421,40 @@ export default function NewProject({ onCreated }) {
     navigate(`/project/${data.id}`)
 
     // Auto-download MPZP act PDF in background (non-blocking)
-    if (data?.id && plot.mpzp_act_url) {
-      const safeName = (plot.mpzp_plan_name || 'uchwala_mpzp')
-        .replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 60)
-      const filename = `${safeName}.pdf`
-      storeMpzpPdf(data.id, plot.mpzp_act_url, filename).then(async (url) => {
-        if (url) {
-          await db.updateProject(data.id, {
-            plot: { ...plot, mpzp_file_url: url, mpzp_file_name: filename, mpzp_file_path: `mpzp/${data.id}/${filename}` }
-          })
-          if (onCreated) await onCreated()
-        }
-      })
+    if (data?.id && plot.mpzp_status === 'covered') {
+      if (!plot.mpzp_act_url) {
+        // MPZP detected but no act URL from KIMPZP — log failure
+        db.updateProject(data.id, {
+          plot: {
+            ...plot,
+            mpzp_import_failed: true,
+            mpzp_failure_reason: 'brak_url_aktu',
+            mpzp_failure_date: new Date().toISOString(),
+          },
+        })
+      } else {
+        const safeName = (plot.mpzp_plan_name || 'uchwala_mpzp')
+          .replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 60)
+        const filename = `${safeName}.pdf`
+        storeMpzpPdf(data.id, plot.mpzp_act_url, filename).then(async (url) => {
+          if (url) {
+            await db.updateProject(data.id, {
+              plot: { ...plot, mpzp_file_url: url, mpzp_file_name: filename, mpzp_file_path: `mpzp/${data.id}/${filename}` }
+            })
+            if (onCreated) await onCreated()
+          } else {
+            // PDF download/storage failed — log failure
+            await db.updateProject(data.id, {
+              plot: {
+                ...plot,
+                mpzp_import_failed: true,
+                mpzp_failure_reason: 'blad_pobierania_pdf',
+                mpzp_failure_date: new Date().toISOString(),
+              },
+            })
+          }
+        })
+      }
     }
   }
 

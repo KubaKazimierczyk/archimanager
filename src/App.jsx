@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import NewProject from './pages/NewProject'
 import ProjectView from './pages/ProjectView'
 import Analytics from './pages/Analytics'
+import MpzpFailures from './pages/MpzpFailures'
 import { db } from './lib/database'
 
 export default function App() {
@@ -70,6 +71,10 @@ export default function App() {
                   historicalData={historicalData}
                 />
               }
+            />
+            <Route
+              path="/mpzp-failures"
+              element={<MpzpFailures onRetried={refreshProjects} />}
             />
           </Routes>
         </div>

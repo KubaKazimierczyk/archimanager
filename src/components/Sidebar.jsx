@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Plus, FolderOpen, BarChart3, Settings, Building2 } from 'lucide-react'
+import { Home, Plus, FolderOpen, BarChart3, Settings, Building2, AlertTriangle } from 'lucide-react'
 
 function NavItem({ icon: Icon, label, active, onClick, badge }) {
   return (
@@ -26,6 +26,7 @@ export default function Sidebar({ projects = [] }) {
   const navigate = useNavigate()
   const location = useLocation()
   const path = location.pathname
+  const mpzpFailureCount = projects.filter(p => p.plot?.mpzp_status === 'covered' && !p.plot?.mpzp_file_url).length
 
   return (
     <div className="w-[260px] bg-white border-r border-slate-200 flex flex-col flex-shrink-0 h-screen">
@@ -72,6 +73,7 @@ export default function Sidebar({ projects = [] }) {
           <span className="text-[10px] font-bold text-slate-300 px-2 uppercase tracking-[1px]">System</span>
         </div>
         <NavItem icon={BarChart3} label="Analityka ML" active={path === '/analytics'} onClick={() => navigate('/analytics')} />
+        <NavItem icon={AlertTriangle} label="Import MPZP — błędy" active={path === '/mpzp-failures'} onClick={() => navigate('/mpzp-failures')} badge={mpzpFailureCount} />
         <NavItem icon={Settings} label="Ustawienia" active={false} onClick={() => {}} />
       </div>
 
